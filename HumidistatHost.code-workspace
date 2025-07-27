@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"path": "./STM32"
+		},
+		{
+			"path": "./Python"
+		},
+		{
+			"path": "./ESP01S"
+		}
+	],
+	"settings": {
+		"clangd.arguments": [        
+			"--compile-commands-dir=${workspaceFolder}/STM32/Debug",
+            "--query-driver=${env:STM32CLT_PATH}/GNU-tools-for-STM32/bin/arm-none-eabi-gcc.exe"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"compounds": [
+			{
+				"name": "Python+STM32同时调试",
+				"configurations": [
+					"Python Debugger: main",
+					"Build & Debug Microcontroller - ST-Link"
+				]
+			}
+		]
+	}
+}
