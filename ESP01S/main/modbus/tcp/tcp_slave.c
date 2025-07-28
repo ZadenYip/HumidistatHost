@@ -22,10 +22,7 @@
 #define MB_TCP_PORT_NUMBER      (CONFIG_FMB_TCP_PORT_DEFAULT)
 
 // Defines below are used to define register start address for each type of Modbus registers
-#define MB_REG_DISCRETE_INPUT_START         (0x0000)
 #define MB_REG_INPUT_START                  (0x0000)
-#define MB_REG_HOLDING_START                (0x0000)
-#define MB_REG_COILS_START                  (0x0000)
 
 #define MB_PAR_INFO_GET_TOUT                (50) // Timeout for get parameter info
 #define MB_CHAN_DATA_MAX_VAL                (10)
@@ -88,33 +85,13 @@ void modbus_init(void)
     // When external master trying to access the register in the area that is not initialized
     // by mbc_slave_set_descriptor() API call then Modbus stack
     // will send exception response for this register area.
-    reg_area.type = MB_PARAM_HOLDING; // Set type of register area
-    reg_area.start_offset = MB_REG_HOLDING_START; // Offset of register area in Modbus protocol
-    reg_area.address = (void*)&holding_reg_params; // Set pointer to storage instance
-    reg_area.size = sizeof(holding_reg_params); // Set the size of register storage instance
+
+    // Initialization of Input Registers area
+    reg_area.type = MB_PARAM_INPUT; // Set type of register area
+    reg_area.start_offset = MB_REG_INPUT_START; // Offset of register area in Modbus protocol
+    reg_area.address = (void*)&input_reg_params; // Set pointer to storage instance
+    reg_area.size = sizeof(input_reg_params); // Set the size of register storage instance
     ESP_ERROR_CHECK(mbc_slave_set_descriptor(reg_area));
-
-    // 不需要的其他modbus寄存器区域
-    // // Initialization of Input Registers area
-    // reg_area.type = MB_PARAM_INPUT;
-    // reg_area.start_offset = MB_REG_INPUT_START;
-    // reg_area.address = (void*)&input_reg_params;
-    // reg_area.size = sizeof(input_reg_params);
-    // ESP_ERROR_CHECK(mbc_slave_set_descriptor(reg_area));
-
-    // // Initialization of Coils register area
-    // reg_area.type = MB_PARAM_COIL;
-    // reg_area.start_offset = MB_REG_COILS_START;
-    // reg_area.address = (void*)&coil_reg_params;
-    // reg_area.size = sizeof(coil_reg_params);
-    // ESP_ERROR_CHECK(mbc_slave_set_descriptor(reg_area));
-
-    // // Initialization of Discrete Inputs register area
-    // reg_area.type = MB_PARAM_DISCRETE;
-    // reg_area.start_offset = MB_REG_DISCRETE_INPUT_START;
-    // reg_area.address = (void*)&discrete_reg_params;
-    // reg_area.size = sizeof(discrete_reg_params);
-    // ESP_ERROR_CHECK(mbc_slave_set_descriptor(reg_area));
 
     // Starts of modbus controller and stack
     ESP_ERROR_CHECK(mbc_slave_start());
@@ -157,7 +134,7 @@ void modbus_deinit(void)
 void modbus_update_temp_and_humi(float temperature, float humidity)
 {
     portENTER_CRITICAL();
-    holding_reg_params.temperature = temperature;
-    holding_reg_params.humidity = humidity;
+    input_reg_params.temperature = temperature;
+    input_reg_params.humidity = humidity;
     portEXIT_CRITICAL();
 }
