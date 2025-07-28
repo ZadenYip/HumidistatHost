@@ -25,8 +25,6 @@
 #define MB_REG_INPUT_START                  (0x0000)
 
 #define MB_PAR_INFO_GET_TOUT                (50) // Timeout for get parameter info
-#define MB_CHAN_DATA_MAX_VAL                (10)
-#define MB_CHAN_DATA_OFFSET                 (1.1f)
 
 #define MB_READ_MASK                        (MB_EVENT_INPUT_REG_RD \
                                                 | MB_EVENT_HOLDING_REG_RD \
@@ -104,14 +102,13 @@ static void modbus_event_task(void *pvParameters) {
         mb_event_group_t event = mbc_slave_check_event(MB_READ_WRITE_MASK);
         const char* rw_str = (event & MB_READ_MASK) ? "READ" : "WRITE";
         // Filter events and process them accordingly
-        // TODO 读取寄存器
-        if (event & (MB_EVENT_HOLDING_REG_WR | MB_EVENT_HOLDING_REG_RD)) {
+        if (event & MB_EVENT_INPUT_REG_RD) {
             // Get parameter information from parameter queue
             ESP_ERROR_CHECK(
                 mbc_slave_get_param_info(&reg_info, MB_PAR_INFO_GET_TOUT));
             ESP_LOGI(
                 kTag,
-                "HOLDING %s (%u us), ADDR:%u, TYPE:%u, INST_ADDR:0x%.4x, SIZE:%u",
+                "INPUT %s (%u us), ADDR:%u, TYPE:%u, INST_ADDR:0x%.4x, SIZE:%u",
                 rw_str, (uint32_t)reg_info.time_stamp, (uint32_t)reg_info.mb_offset,
                 (uint32_t)reg_info.type, (uint32_t)reg_info.address,
                 (uint32_t)reg_info.size);
