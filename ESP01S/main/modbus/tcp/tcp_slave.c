@@ -35,7 +35,7 @@
 #define MB_READ_WRITE_MASK                  (MB_READ_MASK | MB_WRITE_MASK)
 
 static const char kTag[] = "MB_SLAVE";
-static TaskHandle_t mb_event_task_handler;
+static TaskHandle_t mb_event_task_handler = NULL;
 static void modbus_event_task(void *pvParameters);
 
 /**
@@ -56,8 +56,6 @@ void modbus_init(void)
     ESP_ERROR_CHECK(start_mdns_service());
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
-    // Set UART log level
-    esp_log_level_set(kTag, ESP_LOG_INFO);
     void* mbc_slave_handler = NULL;
 
     // Initialization of Modbus controller
@@ -93,7 +91,7 @@ void modbus_init(void)
 
     // Starts of modbus controller and stack
     ESP_ERROR_CHECK(mbc_slave_start());
-    xTaskCreate(modbus_event_task, "modbus_event_task", 1024, NULL, 3, &mb_event_task_handler);
+    xTaskCreate(modbus_event_task, "modbus_event_task", 1024, NULL, 4, &mb_event_task_handler);
 }
 
 static void modbus_event_task(void *pvParameters) {
@@ -119,12 +117,17 @@ static void modbus_event_task(void *pvParameters) {
 void modbus_deinit(void)
 {
     ESP_LOGI(kTag, "Deinitializing Modbus slave stack...");
-    vTaskDelete(mb_event_task_handler);
+    if (mb_event_task_handler == NULL) {
+        ESP_LOGI(kTag, "Modbus event task handler is NULL, cannot delete task.");
+    } else {
+        vTaskDelete(mb_event_task_handler);
+    }
     ESP_LOGI(kTag,"Modbus controller destroyed.");
     vTaskDelay(100);
     // Stop Modbus controller
-    stop_mdns_service();
+    // TODO 由于WIFI密码错误 前面EventBits一直堵塞导致没执行modbus_init
     ESP_ERROR_CHECK(mbc_slave_destroy());
+    stop_mdns_service();
     ESP_LOGI(kTag, "Modbus slave stack deinitialized.");
 }
 

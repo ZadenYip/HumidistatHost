@@ -1,0 +1,2 @@
+EPS01S的ESP_LOGI会影响与STM32进行UART0通信
+若需要开启请在make menuconfig的Component COnfig->log output
