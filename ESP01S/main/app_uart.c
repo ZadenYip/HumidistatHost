@@ -75,8 +75,8 @@ static void app_uart_receive_event_task(void *pvParameters) {
         if (event.type != UART_DATA) {
             continue;
         }
-        /* 若超过1秒没受到则视为接受完一帧  */
-        if (xQueueReceive(uart0_queue, (void *)&event, pdMS_TO_TICKS(1000))) {
+        /* 若超过0.5秒没受到则视为接受完一帧  */
+        if (xQueueReceive(uart0_queue, (void *)&event, pdMS_TO_TICKS(500))) {
             xTimerReset(idle_timer, 0);
             uart_reassemble_frame(event, &frame_buffer);
             ESP_LOGI(kTag, "[UART DATA]: %d", event.size);
@@ -114,11 +114,9 @@ static void receive_one_frame_operation(uart_buffer_t *buffer) {
         ESP_LOGI(kTag, "Received frame is broken, ignoring");
         reset_frame_buffer(buffer);
         return;
-    } else {
-        static char ack_msg[] = "ACK\r\n";
-        uart_write_bytes(UART_NUM_0, ack_msg, strlen(ack_msg));
-        return;
     }
+    static char ack_msg[] = "ACK\r\n";
+    uart_write_bytes(UART_NUM_0, ack_msg, strlen(ack_msg));
     if (!is_end_of_receive(buffer->data, buffer->len)) {
         ESP_LOGI(kTag, "Received frame does not end with CRLF, ignoring");
         reset_frame_buffer(buffer);

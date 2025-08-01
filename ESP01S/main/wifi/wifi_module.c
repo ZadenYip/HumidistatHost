@@ -2,9 +2,11 @@
 #include <string.h>
 
 #include "esp_err.h"
+#include "esp_event.h"
 #include "esp_interface.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
 #include "modbus/tcp/tcp_slave.h"
@@ -27,16 +29,11 @@ static TimerHandle_t wifi_retry_timer = NULL;
 wifi_config_t wifi_cfg = {0};
 
 void wifi_init_main() {
-    wifi_event_group = xEventGroupCreate();
     esp_netif_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                                               &connection_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                               &ip_assigned_handler, NULL));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &wifi_cfg));
     wifi_retry_timer = xTimerCreate("wifi_retry_timer",
@@ -46,13 +43,17 @@ void wifi_init_main() {
 }
 
 static void wifi_load(const char ssid[], const char password[]) {
+    wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
+                                               &connection_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
+                                               &ip_assigned_handler, NULL));
     memcpy(wifi_cfg.sta.ssid, ssid, strlen(ssid));
     memcpy(wifi_cfg.sta.password, password, strlen(password));
 
     if (strlen((char *)wifi_cfg.sta.password)) {
         wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     }
-
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_cfg));
@@ -65,19 +66,13 @@ static void wifi_load(const char ssid[], const char password[]) {
     modbus_init();
 }
 
-static void wifi_reload(const char ssid[], const char password[]) {
-    modbus_deinit();
-    esp_wifi_stop();
-    wifi_load(ssid, password);
-}
-
 void wifi_set_new_config(const char ssid[], const char password[]) {
-    xTimerStop(wifi_retry_timer, 0);
-    ESP_LOGI(kTag, "setting new wifi config: ssid:%s, password:%s",
-             ssid, password);
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
-    wifi_reload(ssid, password);
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_cfg));
+    ESP_LOGI(kTag, "New wifi config set: ssid:%s, password:%s",
+             wifi_cfg.sta.ssid, wifi_cfg.sta.password);
+    ESP_LOGI(kTag, "Restarting ESP...");
+    esp_restart();
 }
 
 /**
