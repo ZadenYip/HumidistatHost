@@ -5,10 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "Python Debugger: ble",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/src/ble.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python Debugger: modbus_master",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/modbus_master.py",
             "console": "integratedTerminal"
         }
     ]

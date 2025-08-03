@@ -6,6 +6,7 @@
 */
 #include <stdio.h>
 #include "esp_err.h"
+#include "esp_modbus_slave.h"
 #include "esp_wifi.h"
 #include "mdns_service.h"
 #include "sdkconfig.h"
@@ -51,7 +52,6 @@ void modbus_init(void)
       result = nvs_flash_init();
     }
     ESP_ERROR_CHECK(result);
-    esp_netif_init();
 
     ESP_ERROR_CHECK(start_mdns_service());
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
@@ -112,23 +112,6 @@ static void modbus_event_task(void *pvParameters) {
                 (uint32_t)reg_info.size);
         }
     }
-}
-
-void modbus_deinit(void)
-{
-    ESP_LOGI(kTag, "Deinitializing Modbus slave stack...");
-    if (mb_event_task_handler == NULL) {
-        ESP_LOGI(kTag, "Modbus event task handler is NULL, cannot delete task.");
-    } else {
-        vTaskDelete(mb_event_task_handler);
-    }
-    ESP_LOGI(kTag,"Modbus controller destroyed.");
-    vTaskDelay(100);
-    // Stop Modbus controller
-    // TODO 由于WIFI密码错误 前面EventBits一直堵塞导致没执行modbus_init
-    ESP_ERROR_CHECK(mbc_slave_destroy());
-    stop_mdns_service();
-    ESP_LOGI(kTag, "Modbus slave stack deinitialized.");
 }
 
 void modbus_update_temp_and_humi(float temperature, float humidity)
