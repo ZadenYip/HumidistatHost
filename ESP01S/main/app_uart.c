@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "FreeRTOS.h"
+#include "esp_system.h"
 #include "modbus//tcp/tcp_slave.h"
 #include "wifi/wifi_module.h"
 #include "esp_log.h"
@@ -164,6 +165,8 @@ static void handle_wifi_command(uart_buffer_t *frame_buffer) {
     memcpy(password, &frame_buffer->data[set_index], password_len);
     password[password_len] = '\0';
     wifi_set_new_config(ssid, password);
+    ESP_LOGI(kTag, "restarting ESP...");
+    esp_restart();
 }
 
 /**

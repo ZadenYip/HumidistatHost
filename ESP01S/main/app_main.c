@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "esp_event.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -8,6 +9,7 @@
 
 #include "wifi_module.h"
 #include "app_uart.h"
+#include "modbus/tcp/tcp_slave.h"
 
 void app_main() {
     /* Print chip information */
@@ -21,5 +23,7 @@ void app_main() {
            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded"
                                                          : "external");
     printf("-----------wifi_init_main()-----------\n");
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_main();
+    modbus_init();
 }
