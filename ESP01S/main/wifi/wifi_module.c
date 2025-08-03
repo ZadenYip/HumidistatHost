@@ -2,54 +2,51 @@
 #include <string.h>
 
 #include "esp_err.h"
-#include "esp_event.h"
 #include "esp_interface.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
+#include "mdns_service.h"
 #include "modbus/tcp/tcp_slave.h"
-
-#define MAX_WIFI_RETRY_CONNECT 3
 static void check_if_already_connected();
 static void connection_handler(void *arg, esp_event_base_t event_base,
                              int32_t event_id, void *event_data);
 static void ip_assigned_handler(void *arg, esp_event_base_t event_base,
                          int32_t event_id, void *event_data);
-static void wifi_reload(const char ssid[], const char password[]);
 static void wifi_retry_timer_callback(TimerHandle_t xTimer);
-static void wifi_load(const char ssid[], const char password[]);
+static void wifi_init_event_handler(void);
+static void wifi_load(void);
 
 EventGroupHandle_t wifi_event_group;
 static const char kTag[] = "WIFI_MODULE";
-static int wifi_retry_num = 0;
 static TimerHandle_t wifi_retry_timer = NULL;
 
 wifi_config_t wifi_cfg = {0};
 
 void wifi_init_main() {
     esp_netif_init();
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &wifi_cfg));
-    wifi_retry_timer = xTimerCreate("wifi_retry_timer",
-                                                pdMS_TO_TICKS(10000), pdFALSE,
-                                                NULL, wifi_retry_timer_callback);
-    wifi_load((char *)wifi_cfg.sta.ssid, (char *)wifi_cfg.sta.password);
+    
+    wifi_load();
 }
 
-static void wifi_load(const char ssid[], const char password[]) {
+static void wifi_init_event_handler() {
+    wifi_retry_timer = xTimerCreate("wifi_retry_timer", pdMS_TO_TICKS(3000),
+                                     pdFALSE, NULL, wifi_retry_timer_callback);
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
                                                &connection_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
                                                &ip_assigned_handler, NULL));
-    memcpy(wifi_cfg.sta.ssid, ssid, strlen(ssid));
-    memcpy(wifi_cfg.sta.password, password, strlen(password));
+}
+
+static void wifi_load(void) {
+    wifi_init_event_handler();
+    wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_get_config(ESP_IF_WIFI_STA, &wifi_cfg));
 
     if (strlen((char *)wifi_cfg.sta.password)) {
         wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
@@ -63,16 +60,15 @@ static void wifi_load(const char ssid[], const char password[]) {
 
     ESP_LOGI(kTag, "wifi_init finished.");
     check_if_already_connected();
-    modbus_init();
 }
 
 void wifi_set_new_config(const char ssid[], const char password[]) {
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_FLASH));
+    memcpy(wifi_cfg.sta.ssid, ssid, strlen(ssid));
+    memcpy(wifi_cfg.sta.password, password, strlen(password));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_cfg));
     ESP_LOGI(kTag, "New wifi config set: ssid:%s, password:%s",
              wifi_cfg.sta.ssid, wifi_cfg.sta.password);
-    ESP_LOGI(kTag, "Restarting ESP...");
-    esp_restart();
 }
 
 /**
@@ -103,19 +99,19 @@ static void connection_handler(void *arg, esp_event_base_t event_base,
     
     if (event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(kTag, "Station started, attempting to connect to AP");
-        esp_wifi_connect();
+        ESP_ERROR_CHECK(esp_wifi_connect());
         return;
     }
     /* 连接失败处理 */
     if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xTimerReset(wifi_retry_timer, 0);
-        ESP_LOGI(kTag, "A retry will be attempted in 10 seconds");
+        ESP_LOGI(kTag, "A retry will be attempted in 3 seconds");
     }
 }
 
 static void wifi_retry_timer_callback(TimerHandle_t xTimer) {
     ESP_LOGI(kTag, "Retry timer expired, reconnecting to AP");
-    esp_wifi_connect();
+    ESP_ERROR_CHECK(esp_wifi_connect());
 }
 
 /**
@@ -127,8 +123,6 @@ static void ip_assigned_handler(void *arg, esp_event_base_t event_base,
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     if (event_id == IP_EVENT_STA_GOT_IP) {
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        wifi_retry_num = 0;
-
         ESP_LOGI(kTag, "got ip:%d.%d.%d.%d", IP2STR(&event->ip_info.ip));
         return;
     }
