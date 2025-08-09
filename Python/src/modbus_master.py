@@ -1,6 +1,7 @@
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf, IPVersion
 from pymodbus.pdu import ModbusPDU
 from pymodbus.client import ModbusTcpClient
+import struct
 import time
 esp01s_address = None
 
@@ -16,6 +17,11 @@ def read_input_registers(client: ModbusTcpClient, address: int, count: int) -> l
     except Exception as e:
         print(f"Exception occurred: {e}")
         return [None, None]
+    
+def convert_registers_to_float(high: int, low: int) -> float:
+    high_bits = struct.pack(">H", high)
+    low_bits = struct.pack(">H", low)
+    return struct.unpack(">f", high_bits + low_bits)[0]
 
 def main() -> None:
     while True:
@@ -23,7 +29,9 @@ def main() -> None:
         client.connect()
         temperature = float()
         humidity = float()
-        temperature, humidity = read_input_registers(client, 0, 2)
+        data = read_input_registers(client, 0, 4)
+        temperature = convert_registers_to_float(data[1], data[0])
+        humidity = convert_registers_to_float(data[3], data[2])
         print(f"Temperature: {temperature}, Humidity: {humidity}")
         client.close()
         time.sleep(2)

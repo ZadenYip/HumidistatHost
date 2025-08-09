@@ -14,8 +14,8 @@
 #pragma pack(push, 1)
 typedef struct
 {
-    float humidity;
     float temperature;
+    float humidity;
 } input_reg_params_t;
 #pragma pack(pop)
 

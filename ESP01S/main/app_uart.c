@@ -185,8 +185,8 @@ static void handle_receive_temp_and_humid(uart_buffer_t *frame_buffer) {
     float humidity = 0.0f;
     memcpy(&temperature, &frame_buffer->data[2], sizeof(float));
     memcpy(&humidity, &frame_buffer->data[6], sizeof(float));
-    ESP_LOGI(kTag, "Received temperature: %.2f, humidity: %.2f", temperature,
-             humidity);
+    ESP_LOGI(kTag, "Received temperature: %d, humidity: %d (decimal)", (uint32_t)temperature,
+             (uint32_t)humidity);
     modbus_update_temp_and_humi(temperature, humidity);
 }
 

@@ -4,6 +4,7 @@
 #include "aht20.h"
 #include "i2c.h"
 #include "main.h"
+#include "stm32f1xx_hal_def.h"
 #include "tim.h"
 #include "usart.h"
 #include "communicate.h"
@@ -28,12 +29,15 @@ void AHT20_Init(void) {
   aht20 = (AHT20){0};
   // 上电后等待40ms
   HAL_Delay(40);
+  
   HAL_I2C_Master_Receive(&hi2c1, AHT20_ADDRESS, aht20.rx_tx_buffer, 1, HAL_MAX_DELAY);
   if (!(aht20.rx_tx_buffer[0] & 0x08)) {
     aht20.rx_tx_buffer[0] = 0xBE;
     aht20.rx_tx_buffer[1] = 0x08;
     aht20.rx_tx_buffer[2] = 0x00;
     HAL_I2C_Master_Transmit(&hi2c1, AHT20_ADDRESS, aht20.rx_tx_buffer, 3, HAL_MAX_DELAY);
+  } else {
+    printf("AHT20 Init Failed\r\n");
   }
 }
 
@@ -48,6 +52,7 @@ void AHT20_SendMeasurement(void) {
 }
 
 void AHT20_DMATxCpltOrWait1MoreTime(void) {
+  HAL_TIM_Base_Stop_IT(&htim1);
   // 重置定时器计数器
   __HAL_TIM_SET_COUNTER(&htim1, 0); 
   // 用定时器等待75ms 然后中断调用AHT20_WaitMeasDone

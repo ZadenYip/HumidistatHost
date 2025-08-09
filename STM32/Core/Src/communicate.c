@@ -1,6 +1,7 @@
 #include "communicate.h"
 #include "aht20.h"
 #include "main.h"
+#include "stm32f103xb.h"
 #include "stm32f1xx_hal_def.h"
 #include "stm32f1xx_hal_uart.h"
 #include "usart.h"
@@ -32,36 +33,46 @@ typedef enum {
   HEADER_ESP01S_RECEIVE_TEMP_AND_HUMI = 0x01
 } ESP01SCommandType;
 
+uint8_t is_waiting_or_handling_command = 0;
 /**
  * @brief 等待 蓝牙模块通过USART3发送的命令
  * 命令格式第一个字节为命令字节，后面跟随参数。
  *
  */
 void wait_for_command(void) {
-  for (uint16_t rx_length = 0;;) {
-    HAL_UARTEx_ReceiveToIdle(&huart3, (uint8_t *)&communication_msg,
-                             sizeof(communication_msg), &rx_length,
-                             HAL_MAX_DELAY);
-    if (is_command_end((uint8_t *)communication_msg, rx_length)) {
-      if (is_data_broken((uint8_t *)communication_msg, rx_length)) {
-        strcpy(communication_msg, "NAK\r\n");
-        HAL_UART_Transmit(&huart3, (uint8_t *)communication_msg,
-                          strlen(communication_msg), HAL_MAX_DELAY);
-        rx_length = 0;
-        continue;
-      } else {
-        char ack_msg[] = "ACK\r\n";
-        HAL_UART_Transmit(&huart3, (uint8_t *)ack_msg, strlen(ack_msg),
-                          HAL_MAX_DELAY);
-        break;
-      }
-    } else {
-      strcpy(communication_msg, "wrong format\r\n");
-      HAL_UART_Transmit(&huart3, (uint8_t *)communication_msg,
-                        strlen(communication_msg), HAL_MAX_DELAY);
-    }
+  if (is_waiting_or_handling_command) {
+    return;
   }
+  is_waiting_or_handling_command = 1;
+  HAL_UARTEx_ReceiveToIdle_IT(&huart3, (uint8_t *)&communication_msg,
+                              sizeof(communication_msg));
+}
 
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_length) {
+
+  if (huart->Instance != huart3.Instance) {
+    // 不是USART3的回调，直接返回
+    return;
+  }
+  if (is_data_broken((uint8_t *)communication_msg, rx_length)) {
+    strcpy(communication_msg, "NAK\r\n");
+    HAL_UART_Transmit(&huart3, (uint8_t *)communication_msg,
+                      strlen(communication_msg), HAL_MAX_DELAY);
+    is_waiting_or_handling_command = 0;
+    return;
+  }
+  if (!is_command_end((uint8_t *)communication_msg, rx_length)) {
+    strcpy(communication_msg, "wrong format\r\n");
+    HAL_UART_Transmit(&huart3, (uint8_t *)communication_msg,
+                      strlen(communication_msg), HAL_MAX_DELAY);
+    is_waiting_or_handling_command = 0;
+    return;
+  }
+  
+
+  char ack_msg[] = "ACK\r\n";
+  HAL_UART_Transmit(&huart3, (uint8_t *)ack_msg, strlen(ack_msg),
+                    HAL_MAX_DELAY);
   if (communication_msg[0] == HEADER_MEASURE) {
     AHT20MeasureTrigger();
   } else if (communication_msg[0] == HEADER_SET_WIFI) {
@@ -71,6 +82,7 @@ void wait_for_command(void) {
     HAL_UART_Transmit(&huart3, (uint8_t *)communication_msg,
                       strlen(communication_msg), HAL_MAX_DELAY);
   }
+  is_waiting_or_handling_command = 0;
 }
 
 void SetWIFIConfiguration(char upper_msg[]) {
@@ -140,12 +152,14 @@ void transmit_temp_and_humi_to_esp(float temperature, float humidity) {
 static void transmit_with_ARQ(UART_HandleTypeDef *huart2,
                               uint8_t *communication_msg, uint16_t msg_size) {
   static char response_msg[6] = {0};
+  uint8_t retry_count = 0;
   do {
     HAL_UART_Transmit(huart2, communication_msg, msg_size, HAL_MAX_DELAY);
     uint16_t rx_length = 0;
     HAL_UARTEx_ReceiveToIdle(huart2, (uint8_t *)response_msg,
                              sizeof(response_msg), &rx_length, 1000);
-  } while (strcmp(response_msg, "ACK\r\n") != 0);
+    retry_count++;
+  } while (strcmp(response_msg, "ACK\r\n") != 0 && retry_count < 3);
 }
 
 /**
