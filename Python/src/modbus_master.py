@@ -30,6 +30,8 @@ def main() -> None:
         temperature = float()
         humidity = float()
         data = read_input_registers(client, 0, 4)
+        # 尽管经过包装给程序员呈现的是大端序，但是温湿度为32bit, 传过来是以16bit register去读
+        # 包装给程序员是16bit呈现的是大端序，但是32bit被拆成单独两个16bit 反而第二个16bit是高位数据 
         temperature = convert_registers_to_float(data[1], data[0])
         humidity = convert_registers_to_float(data[3], data[2])
         print(f"Temperature: {temperature}, Humidity: {humidity}")
