@@ -1,2 +1,2 @@
-STM32/Drivers/ linguist-generated=true
+STM32/Drivers/** linguist-vendored=true
 STM32/startup_stm32f103xb.s linguist-generated=true
